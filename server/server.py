@@ -6,6 +6,7 @@ import tornado.ioloop
 import cv2
 import numpy as np
 import pytesseract
+from datetime import datetime
 import re
 
 def parse_voda(src):
@@ -92,12 +93,14 @@ def parse_plyn(src):
     return re.sub('[\W]', '', word)
 
 def persist_image(image, label):
+    now = datetime.now()
     timestamp = datetime.timestamp(now)
     filename = '{}-{}.png'.format(timestamp, label)
     cv2.imwrite('data/' + filename, image)
 
 def persist_data(filename, data):
     with open(filename, "a") as file_object:
+        now = datetime.now()
         file_object.write(now.strftime("%Y-%m-%d %H:%M:%S"))
         file_object.write(" ")
         file_object.write(data)
@@ -145,6 +148,6 @@ if (__name__ == "__main__"):
         ("/img/(.*)", tornado.web.StaticFileHandler, {'path': 'upload'})
     ])
 
-    app.listen(8080)
-    print("Listening on port 8080")
+    app.listen(8266)
+    print("Listening on port 8266")
     tornado.ioloop.IOLoop.instance().start()
