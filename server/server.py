@@ -8,21 +8,21 @@ import numpy as np
 import pytesseract
 
 def parse_voda(src):
-    src = src[260:380, 150:770] # 144.261 610x120
+    src = src[200:320, 40:560] # 40,200 520x120 # y1:y2, x1,x2
     blue_channel = src[:,:,0]
-    blurred = cv2.GaussianBlur(blue_channel, (7, 7), 0)
-    thresh = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 31, 10)
+    blurred = cv2.GaussianBlur(blue_channel, (5,5), 0)
+    thresh = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 31, 15)
     kernel = np.ones((3,3),np.uint8)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
 
     numbers = [] # 60x100
-    numbers.append(closing[5:120, 0:70])
-    numbers.append(closing[5:120, 95:165])
-    numbers.append(closing[5:120, 195:265])
-    numbers.append(closing[5:120, 290:360])
-    numbers.append(closing[5:120, 380:450])
-    numbers.append(closing[5:120, 460:530])
-    numbers.append(closing[5:120, 550:620])
+    numbers.append(closing[5:120, 0:60])
+    numbers.append(closing[5:120, 95:155])
+    numbers.append(closing[5:120, 185:245])
+    numbers.append(closing[5:120, 260:320])
+    numbers.append(closing[5:120, 330:390])
+    numbers.append(closing[5:120, 395:455])
+    numbers.append(closing[5:120, 480:520])
 
     digits = []
     for number in numbers:
@@ -41,35 +41,34 @@ def parse_voda(src):
     return word
 
 def parse_plyn(src):
-    src = src[330:460, 70:800] # 70x330 730x130
-
-    (h, w) = src.shape[:2]
-    (cX, cY) = (w // 2, h // 2)
-
-    M = cv2.getRotationMatrix2D((cX, cY), -1.6, 1.0)
-    src = cv2.warpAffine(src, M, (w, h))
+    src = src[210:330, 25:575] # 25,210 550x120 # y1:y2, x1:x2
 
     blue_channel = src[:,:,0]
 
     no_spec=blue_channel.copy()
-    no_spec[no_spec > 190] = 0
 
-    blurred = cv2.GaussianBlur(no_spec, (5, 5), 0)
+    blurred = cv2.GaussianBlur(no_spec, (3, 3), 0)
     thresh = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -15)
+	
+	(contours, hierarchy) = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+    for i,v in enumerate(contours):
+        x,y,w,h = cv2.boundingRect(v)
+        if w > 50:
+             _ = cv2.drawContours(image=thresh, contours=contours, contourIdx=i, color=(0,0,0), thickness=cv2.FILLED)
 
-    kernel = np.ones((3,3),np.uint8)
-    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-    opening = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)
+    kernel = np.ones((5,1),np.uint8)
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, np.ones((1,5),np.uint8))
+    opening = cv2.morphologyEx(opening, cv2.MORPH_OPEN, kernel)
+    opening = cv2.morphologyEx(opening, cv2.MORPH_ERODE, np.ones((1,5),np.uint8))
 
-    numbers = [] # 60x100
-    numbers.append(opening[15:115, 30:90])
-    numbers.append(opening[15:115, 115:175])
-    numbers.append(opening[15:115, 195:255])
-    numbers.append(opening[15:115, 285:345])
-    numbers.append(opening[15:115, 370:430])
-    numbers.append(opening[15:115, 455:515])
-    numbers.append(opening[15:115, 545:605])
-    numbers.append(opening[15:115, 650:710])
+    numbers = [] # 50x100
+    numbers.append(opening[15:115, 10:60])
+    numbers.append(opening[15:115, 90:140])
+    numbers.append(opening[15:115, 170:220])
+    numbers.append(opening[15:115, 240:290])
+    numbers.append(opening[15:115, 320:370])
+    numbers.append(opening[15:115, 395:445])
+    numbers.append(opening[15:115, 490:540])
 
 
     digits = []
@@ -90,6 +89,13 @@ def parse_plyn(src):
     word = pytesseract.image_to_string(numpy_horizontal_concat, config='--psm 8')
     return word
 
+def persist_data(filename, data):
+    with open(filename, "a") as file_object:
+	    file_object.write(now.strftime("%Y-%m-%d %H:%M:%S"))
+		file_object.write(" ")
+        file_object.write(data)
+		file_object.write("\n")
+
 class index(tornado.web.RequestHandler):
     def get(self):
         self.render("index.html")
@@ -105,6 +111,7 @@ class uploadImgHandler_voda(tornado.web.RequestHandler):
         nparr = np.frombuffer(f.body, np.uint8)
         img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         text = parse_voda(img_np)
+		persist_data("voda.txt", text)
 
         self.write(text)
 
@@ -119,6 +126,7 @@ class uploadImgHandler_plyn(tornado.web.RequestHandler):
         nparr = np.frombuffer(f.body, np.uint8)
         img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         text = parse_plyn(img_np)
+		persist_data("plyn.txt", text)
 
         self.write(text)
 

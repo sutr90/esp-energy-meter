@@ -54,15 +54,11 @@ void setup() {
   config.pixel_format = PIXFORMAT_JPEG;
 
   // init with high specs to pre-allocate larger buffers
-  if(psramFound()){
-    config.frame_size = FRAMESIZE_SVGA;
-    config.jpeg_quality = 10;  //0-63 lower number means higher quality
-    config.fb_count = 2;
-  } else {
-    config.frame_size = FRAMESIZE_CIF;
+
+    config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 12;  //0-63 lower number means higher quality
     config.fb_count = 1;
-  }
+  
   
   // camera init
   esp_err_t err = esp_camera_init(&config);
