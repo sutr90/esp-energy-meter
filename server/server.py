@@ -6,6 +6,7 @@ import tornado.ioloop
 import cv2
 import numpy as np
 import pytesseract
+import re
 
 def parse_voda(src):
     src = src[200:320, 40:560] # 40,200 520x120 # y1:y2, x1,x2
@@ -36,9 +37,9 @@ def parse_voda(src):
         img = cv2.bitwise_not(image_copy)
         digits.append(img)
     numpy_horizontal_concat = np.concatenate(digits, axis=1)
+    persist_image(numpy_horizontal_concat, 'voda')
     word = pytesseract.image_to_string(numpy_horizontal_concat, config='--psm 13')
-
-    return word
+    return re.sub('[\W]', '', word)
 
 def parse_plyn(src):
     src = src[210:330, 25:575] # 25,210 550x120 # y1:y2, x1:x2
@@ -49,8 +50,8 @@ def parse_plyn(src):
 
     blurred = cv2.GaussianBlur(no_spec, (3, 3), 0)
     thresh = cv2.adaptiveThreshold(blurred, 255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 27, -15)
-	
-	(contours, hierarchy) = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+    
+    (contours, hierarchy) = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
     for i,v in enumerate(contours):
         x,y,w,h = cv2.boundingRect(v)
         if w > 50:
@@ -65,7 +66,7 @@ def parse_plyn(src):
     numbers.append(opening[15:115, 10:60])
     numbers.append(opening[15:115, 90:140])
     numbers.append(opening[15:115, 170:220])
-    numbers.append(opening[15:115, 240:290])
+    numbers.append(opening[15:115, 245:295])
     numbers.append(opening[15:115, 320:370])
     numbers.append(opening[15:115, 395:445])
     numbers.append(opening[15:115, 490:540])
@@ -85,16 +86,22 @@ def parse_plyn(src):
         digits.append(img)
 
     numpy_horizontal_concat = np.concatenate(digits, axis=1)
+    persist_image(numpy_horizontal_concat, 'plyn')
 
-    word = pytesseract.image_to_string(numpy_horizontal_concat, config='--psm 8')
-    return word
+    word = pytesseract.image_to_string(numpy_horizontal_concat, config='--psm 13')
+    return re.sub('[\W]', '', word)
+
+def persist_image(image, label):
+    timestamp = datetime.timestamp(now)
+    filename = '{}-{}.png'.format(timestamp, label)
+    cv2.imwrite('data/' + filename, image)
 
 def persist_data(filename, data):
     with open(filename, "a") as file_object:
-	    file_object.write(now.strftime("%Y-%m-%d %H:%M:%S"))
-		file_object.write(" ")
+        file_object.write(now.strftime("%Y-%m-%d %H:%M:%S"))
+        file_object.write(" ")
         file_object.write(data)
-		file_object.write("\n")
+        file_object.write("\n")
 
 class index(tornado.web.RequestHandler):
     def get(self):
@@ -111,7 +118,7 @@ class uploadImgHandler_voda(tornado.web.RequestHandler):
         nparr = np.frombuffer(f.body, np.uint8)
         img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         text = parse_voda(img_np)
-		persist_data("voda.txt", text)
+        persist_data("voda.txt", text)
 
         self.write(text)
 
@@ -126,7 +133,7 @@ class uploadImgHandler_plyn(tornado.web.RequestHandler):
         nparr = np.frombuffer(f.body, np.uint8)
         img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         text = parse_plyn(img_np)
-		persist_data("plyn.txt", text)
+        persist_data("plyn.txt", text)
 
         self.write(text)
 
